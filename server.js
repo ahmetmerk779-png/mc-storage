@@ -7,6 +7,11 @@ let storedData = {
     bots: []
 };
 
+// Tarayıcıdan açıldığında kontrol için
+app.get('/', (req, res) => {
+    res.send('mc-storage API aktif ve çalışıyor!');
+});
+
 // Verileri alma endpoint'i
 app.get('/data', (req, res) => {
     res.json(storedData);
@@ -24,5 +29,5 @@ app.post('/data', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Depolama API'si ${PORT} portunda aktif.`);
+    console.log(`🚀 Depolama API'si ${PORT} portunda aktif.`);
 });
