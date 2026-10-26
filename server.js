@@ -1,42 +1,68 @@
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
+const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
-
-app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-let storedData = {
-    globalConfig: {},
-    bots: []
-};
+// Verilerin kalıcı olması için sunucu dizininde bir JSON dosyası
+const DATA_FILE = path.join(__dirname, 'storage_data.json');
 
-// Verileri alma endpoint'i
-app.get('/data', (req, res) => {
-    res.json(storedData);
-});
-
-// Bot yöneticisinin verileri güncellediği / logları aktardığı endpoint
-app.post('/data', (req, res) => {
-    if (req.body) {
-        storedData = req.body;
-        res.json({ success: true });
-        // Tarayıcıdan izleyen varsa ekrandakileri anında güncelle
-        io.emit('data-updated', storedData);
-    } else {
-        res.status(400).json({ error: 'Geçersiz veri' });
+// Depolama dosyasını okuma fonksiyonu
+function readStorage() {
+    try {
+        if (fs.existsSync(DATA_FILE)) {
+            const raw = fs.readFileSync(DATA_FILE, 'utf8');
+            return JSON.parse(raw);
+        }
+    } catch (e) {
+        console.error('Veri okuma hatası:', e);
     }
+    return {};
+}
+
+// Depolama dosyasına yazma fonksiyonu
+function writeStorage(data) {
+    try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+    } catch (e) {
+        console.error('Veri yazma hatası:', e);
+    }
+}
+
+// GET: Belirli bir site anahtarına (siteKey) ait bot ve konfigürasyon verisini çekme
+app.get('/data/:siteKey', (req, res) => {
+    const siteKey = req.params.siteKey;
+    const storage = readStorage();
+    const siteData = storage[siteKey] || {
+        globalConfig: {},
+        bots: []
+    };
+    res.json(siteData);
 });
 
-io.on('connection', (socket) => {
-    socket.emit('init-storage', storedData);
+// POST: Belirli bir site anahtarına (siteKey) ait bot ve konfigürasyon verisini kaydetme
+app.post('/data/:siteKey', (req, res) => {
+    const siteKey = req.params.siteKey;
+    const { globalConfig, bots } = req.body;
+    
+    const storage = readStorage();
+    storage[siteKey] = {
+        globalConfig: globalConfig || {},
+        bots: bots || [],
+        updatedAt: Date.now()
+    };
+    
+    writeStorage(storage);
+    res.json({ success: true, siteKey, botCount: (bots || []).length });
+});
+
+// Sağlık kontrolü (Health check)
+app.get('/', (req, res) => {
+    res.send('🚀 MC-Storage Merkezi Depolama Servisi Aktif!');
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 mc-storage ve İzleme Paneli ${PORT} portunda aktif.`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`📦 MC-Storage Sunucusu ${PORT} portunda başlatıldı.`);
 });
