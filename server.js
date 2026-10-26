@@ -5,10 +5,18 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 
-// Verilerin kalıcı olması için sunucu dizininde bir JSON dosyası
+// Basit CORS desteği (servisler arası sorunsuz haberleşme için)
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
+    next();
+});
+
+// Verilerin kalıcı olarak saklandığı JSON dosyası
 const DATA_FILE = path.join(__dirname, 'storage_data.json');
 
-// Depolama dosyasını okuma fonksiyonu
 function readStorage() {
     try {
         if (fs.existsSync(DATA_FILE)) {
@@ -21,7 +29,6 @@ function readStorage() {
     return {};
 }
 
-// Depolama dosyasına yazma fonksiyonu
 function writeStorage(data) {
     try {
         fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
@@ -30,7 +37,7 @@ function writeStorage(data) {
     }
 }
 
-// GET: Belirli bir site anahtarına (siteKey) ait bot ve konfigürasyon verisini çekme
+// GET: Belirli bir sitenin/servisin verilerini çekme
 app.get('/data/:siteKey', (req, res) => {
     const siteKey = req.params.siteKey;
     const storage = readStorage();
@@ -41,7 +48,7 @@ app.get('/data/:siteKey', (req, res) => {
     res.json(siteData);
 });
 
-// POST: Belirli bir site anahtarına (siteKey) ait bot ve konfigürasyon verisini kaydetme
+// POST: Belirli bir sitenin/servisin verilerini kaydetme (Sildiğin botlar anında güncellenir ve geri gelmez)
 app.post('/data/:siteKey', (req, res) => {
     const siteKey = req.params.siteKey;
     const { globalConfig, bots } = req.body;
@@ -49,7 +56,7 @@ app.post('/data/:siteKey', (req, res) => {
     const storage = readStorage();
     storage[siteKey] = {
         globalConfig: globalConfig || {},
-        bots: bots || [],
+        bots: Array.isArray(bots) ? bots : [],
         updatedAt: Date.now()
     };
     
@@ -57,9 +64,9 @@ app.post('/data/:siteKey', (req, res) => {
     res.json({ success: true, siteKey, botCount: (bots || []).length });
 });
 
-// Sağlık kontrolü (Health check)
+// Sağlık kontrolü
 app.get('/', (req, res) => {
-    res.send('🚀 MC-Storage Merkezi Depolama Servisi Aktif!');
+    res.send('🚀 MC-Storage Depolama Servisi Aktif ve Çalışıyor!');
 });
 
 const PORT = process.env.PORT || 3000;
